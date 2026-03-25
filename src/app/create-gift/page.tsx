@@ -341,7 +341,7 @@ export default function CreateGiftPage() {
 
               <div className="flex flex-col gap-4">
                 <a href={generatedLink} className="inline-flex items-center justify-center gap-2 text-white bg-gray-800 px-6 py-4 rounded-2xl font-bold hover:bg-gray-700 transition shadow-lg" target="_blank">
-                  Trải Nghiệm Đỉnh Cao Ngay <ArrowRight size={18} />
+                  Xem thử ngay <ArrowRight size={18} />
                 </a>
               </div>
             </motion.div>

@@ -1,4 +1,5 @@
 import GiftBox from "@/components/GiftBox";
+import Envelope from "@/components/Envelope";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -63,7 +64,22 @@ export default async function DynamicGiftPage({
       <div className={`absolute top-[-20%] left-[-10%] w-[500px] h-[500px] ${bgColor1} rounded-full mix-blend-multiply filter blur-[100px] opacity-60 animate-pulse`}></div>
       <div className={`absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] ${bgColor2} rounded-full mix-blend-multiply filter blur-[100px] opacity-60 animate-pulse`} style={{ animationDelay: '1s' }}></div>
       
-      <GiftBox sender={gift.sender} message={finalMessage} imageUrl={gift.image_url} music={gift.music} theme={theme} />
+      {slug.includes("-card-") ? (
+        <Envelope 
+          title={`Từ ${gift.sender} gửi ${gift.recipient}`} 
+          message={finalMessage} 
+          photoUrl={gift.image_url || undefined} 
+          musicUrl={gift.music || undefined} 
+        />
+      ) : (
+        <GiftBox 
+          sender={gift.sender} 
+          message={finalMessage} 
+          imageUrl={gift.image_url} 
+          music={gift.music} 
+          theme={theme} 
+        />
+      )}
     </main>
   );
 }
