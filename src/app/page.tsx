@@ -11,73 +11,90 @@ export default function Home() {
   const [results, setResults] = useState<{ anime: Character[], celebrity: Character[] } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
+  const cleanName = (rawText: string) => {
+    return rawText.replace(/_/g, " ").replace(/\s*\([^)]*\)\s*/g, '');
+  };
+
   const handleSearch = async (day: string, month: string) => {
     setIsSearching(true);
     setResults(null);
     const searchDate = `${day}/${month}`;
     
-    // 1. Anime Characters (from internal DB as Anime APIs don't support robust date querying)
+    // 1. Anime Matches
     const animeMatches = charactersData.filter(char => char.birthDate === searchDate && char.type === "anime");
-    let fallbackCelebrities = charactersData.filter(char => char.birthDate === searchDate && char.type === "celebrity");
+    let mappedCelebrities: Character[] = charactersData.filter(char => char.birthDate === searchDate && char.type === "celebrity");
 
-    // 2. Wikipedia On This Day API (for Celebrities)
+    // 2. Wikipedia On This Day API (for Celebrities & Events)
     try {
-      const res = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/vi/onthisday/births/${month}/${day}`);
-      if (!res.ok) {
-        // Fallback to English Wikipedia if Vietnamese has insufficient data
-        const enRes = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/births/${month}/${day}`);
-        if (!enRes.ok) throw new Error("Wiki API Error");
-        
-        const data = await enRes.json();
-        const wikiCelebrities: Character[] = data.births
+      // Bắt API Births (Người sinh ra)
+      const resBirth = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/vi/onthisday/births/${month}/${day}`);
+      const resEnBirth = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/births/${month}/${day}`); // Fallback
+      
+      let birthData = resBirth.ok ? await resBirth.json() : (resEnBirth.ok ? await resEnBirth.json() : null);
+      
+      if (birthData && birthData.births) {
+        const wikiBirths: Character[] = birthData.births
           .map((b: any, i: number) => {
             const page = b.pages?.[0];
+            const name = cleanName(page?.title || b.text.split(" - ")[0]);
+            let desc = page?.extract || page?.description || b.text;
+            if (desc.length > 120) desc = desc.substring(0, 120) + "...";
+            
             return {
-              id: `wiki-en-${i}`,
-              name: page?.title || b.text,
+              id: `wiki-birth-${i}`,
+              name: name,
               birthDate: searchDate,
-              image: page?.thumbnail?.source || "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Wikipedia-logo-v2.svg/150px-Wikipedia-logo-v2.svg.png",
-              series: `Sinh năm ${b.year}`,
-              description: page?.extract || page?.description || b.text,
+              avatar: page?.thumbnail?.source || "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Wikipedia-logo-v2.svg/150px-Wikipedia-logo-v2.svg.png",
+              occupation: b.year ? `Sinh năm ${b.year}` : "Người nổi tiếng",
+              didYouKnow: desc,
               type: 'celebrity'
-            };
+            } as Character;
           })
-          .filter((c: any) => c.image && !c.image.includes("Wikipedia-logo"));
+          .filter((c: any) => c.avatar && !c.avatar.includes("Wikipedia-logo"));
 
-        fallbackCelebrities = [...fallbackCelebrities, ...wikiCelebrities];
-      } else {
-        const data = await res.json();
-        const wikiCelebrities: Character[] = data.births
-          .map((b: any, i: number) => {
-            const page = b.pages?.[0];
-            return {
-              id: `wiki-vi-${i}`,
-              name: page?.title || b.text,
-              birthDate: searchDate,
-              image: page?.thumbnail?.source || "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Wikipedia-logo-v2.svg/150px-Wikipedia-logo-v2.svg.png",
-              series: `Năm ${b.year}`,
-              description: page?.extract || page?.description || b.text,
-              type: 'celebrity'
-            };
-          })
-          .filter((c: any) => c.image && !c.image.includes("Wikipedia-logo"));
-
-        if (wikiCelebrities.length > 0) {
-          fallbackCelebrities = [...fallbackCelebrities, ...wikiCelebrities];
-        } else {
-          throw new Error("Empty VI data");
-        }
+        mappedCelebrities = [...mappedCelebrities, ...wikiBirths];
       }
+
+      // Bắt API Events (Sự kiện lịch sử)
+      const resEvent = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/vi/onthisday/events/${month}/${day}`);
+      const resEnEvent = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/events/${month}/${day}`);
+      
+      let eventData = resEvent.ok ? await resEvent.json() : (resEnEvent.ok ? await resEnEvent.json() : null);
+
+      if (eventData && eventData.events) {
+        const wikiEvents: Character[] = eventData.events
+          .map((e: any, i: number) => {
+            const page = e.pages?.[0];
+            let desc = page?.extract || e.text;
+            if (desc.length > 150) desc = desc.substring(0, 150) + "...";
+            
+            return {
+              id: `wiki-event-${i}`,
+              name: `Sự kiện Năm ${e.year}`,
+              birthDate: searchDate,
+              avatar: page?.thumbnail?.source || "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Wikipedia-logo-v2.svg/150px-Wikipedia-logo-v2.svg.png",
+              occupation: "Dấu ấn lịch sử",
+              didYouKnow: desc,
+              type: 'celebrity' // Reusing formatting
+            } as Character;
+          })
+          .filter((c: any) => c.avatar && !c.avatar.includes("Wikipedia-logo"));
+
+        mappedCelebrities = [...mappedCelebrities, ...wikiEvents];
+      }
+
     } catch (err) {
-      console.warn("Failed to fetch Wikipedia API, using local mock data.");
+      console.warn("Lỗi tải API Wikipedia, chuyển sang dữ liệu nội bộ.");
     } finally {
-      // De-duplicate by name and Limit to 30 to not overwhelm UI
-      const uniqueCelebrities = Array.from(new Map(fallbackCelebrities.map(item => [item.name, item])).values());
-      const selectedCelebrities = uniqueCelebrities.slice(0, 15);
+      // Remove pure duplicates by name
+      const uniqueItems = Array.from(new Map(mappedCelebrities.map(item => [item.name, item])).values());
+      
+      // Shuffle random top 15 events/people so it's always interesting
+      const shuffled = uniqueItems.sort(() => 0.5 - Math.random());
       
       setResults({ 
         anime: animeMatches, 
-        celebrity: selectedCelebrities 
+        celebrity: shuffled.slice(0, 18) 
       });
       setIsSearching(false);
     }
@@ -105,7 +122,7 @@ export default function Home() {
             Hôm Nay Là <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-pastel-blue">Sinh Nhật</span> Ai?
           </h1>
           <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto font-medium">
-            Khám phá những nhân vật anime huyền thoại và vĩ nhân thế giới chia sẻ cùng ngày sinh với bạn!
+            Khám phá những nhân vật anime huyền thoại, vĩ nhân thế giới và các sự kiện lịch sử cùng ngày với bạn!
           </p>
         </motion.div>
 
@@ -115,7 +132,7 @@ export default function Home() {
           {isSearching && (
             <div className="mt-8 flex flex-col items-center justify-center text-pastel-blue drop-shadow-sm">
               <Loader2 className="animate-spin mb-4" size={40} />
-              <p className="font-bold tracking-widest uppercase animate-pulse">Đang Lục Tìm Trong Bách Khoa Toàn Thư Wikipedia...</p>
+              <p className="font-bold tracking-widest uppercase animate-pulse">Đang Lục Tìm Bách Khoa Toàn Thư Wikipedia...</p>
             </div>
           )}
         </div>
@@ -143,7 +160,7 @@ export default function Home() {
               {results.anime.length === 0 && results.celebrity.length === 0 ? (
                 <div className="text-center bg-white/50 p-10 rounded-[2rem] border border-dashed border-gray-300 max-w-lg mx-auto">
                   <p className="text-xl text-gray-600 font-medium">
-                    Oops! Hiện chưa có dữ liệu nhân vật nào sinh vào ngày này trong vũ trụ của chúng ta. 🛸
+                    Oops! Hiện chưa có dữ liệu nào xảy ra vào ngày này trong vũ trụ. 🛸
                   </p>
                 </div>
               ) : (
@@ -164,10 +181,10 @@ export default function Home() {
                      <section className="flex flex-col items-center">
                        <div className="bg-pastel-blue/20 px-8 py-3 rounded-full mb-8">
                          <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                           🌎 Từ Bách Khoa Toàn Thư (Wikipedia)
+                           🌎 Từ Wikipedia (Khởi Sinh & Lịch Sử)
                          </h2>
                        </div>
-                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 w-full justify-items-center">
+                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 md:gap-x-12 gap-y-12 w-full justify-items-center">
                          {results.celebrity.map(char => <CharacterCard key={char.id} character={char} />)}
                        </div>
                      </section>

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, ArrowRight, Wand2, Copy, Check, PenTool, Image as ImageIcon, Music, Palette, UploadCloud, Tag, QrCode } from "lucide-react";
+import { Sparkles, ArrowRight, Wand2, Copy, Check, PenTool, Image as ImageIcon, Music, Palette, UploadCloud, Tag, QrCode, Search, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { charactersData } from "@/data/mockData";
 import { supabase } from "@/lib/supabase";
@@ -12,11 +12,18 @@ export default function CreateGiftPage() {
   const [mode, setMode] = useState("AI"); 
   const [style, setStyle] = useState("Doraemon");
   const [customMessage, setCustomMessage] = useState("");
-  const [giftType, setGiftType] = useState("gift"); // "gift", "card"
+  const [giftType, setGiftType] = useState("gift"); 
   
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [music, setMusic] = useState("none");
+  const [musicChoice, setMusicChoice] = useState("none"); // "none", "itunes", "upload"
   const [musicFile, setMusicFile] = useState<File | null>(null);
+  
+  // iTunes Search
+  const [songQuery, setSongQuery] = useState("");
+  const [isSearchingSong, setIsSearchingSong] = useState(false);
+  const [songResults, setSongResults] = useState<any[]>([]);
+  const [selectedSong, setSelectedSong] = useState<any | null>(null);
+
   const [themeColor, setThemeColor] = useState("pink");
   
   const [isGenerating, setIsGenerating] = useState(false);
@@ -27,54 +34,58 @@ export default function CreateGiftPage() {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
   };
 
+  const handleSearchSong = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!songQuery) return;
+    setIsSearchingSong(true);
+    setSongResults([]);
+    try {
+      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(songQuery)}&media=music&limit=4`);
+      const data = await res.json();
+      setSongResults(data.results.filter((r: any) => r.previewUrl));
+    } catch {
+      alert("Lỗi kết nối đên Apple iTunes!");
+    } finally {
+      setIsSearchingSong(false);
+    }
+  };
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recipient || !sender) return;
     if (mode === "CUSTOM" && !customMessage) return;
-    if (music === "upload" && !musicFile) {
-      alert("Vui lòng chọn file nhạc nền để tải lên nhé!");
-      return;
-    }
     
     setIsGenerating(true);
     
     try {
-      // 1. Generate elegant slug
       const safeName = removeAccents(recipient).toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
       const shortId = Math.random().toString(36).substring(2, 6);
       const slug = `${safeName}-${giftType}-${shortId}`;
 
-      // 2. Upload photo if chosen
+      // Upload Image
       let uploadedImageUrl = null;
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${slug}-img-${Date.now()}.${fileExt}`;
-        
         const { data: uploadData, error: uploadError } = await supabase.storage.from('gifts_media').upload(fileName, imageFile);
-        if (uploadError) {
-          console.error("Upload image error:", uploadError);
-          alert("Tải ảnh thất bại! Hãy chắc chắn kho lưu trữ đã được mở khóa.");
-        } else if (uploadData) {
+        if (!uploadError && uploadData) {
           uploadedImageUrl = supabase.storage.from('gifts_media').getPublicUrl(fileName).data.publicUrl;
         }
       }
 
-      // 3. Upload audio if custom
-      let finalMusicUrl = music;
-      if (music === "upload" && musicFile) {
+      // Handle Audio Upload
+      let finalMusicUrl = "";
+      if (musicChoice === "itunes" && selectedSong) {
+        finalMusicUrl = selectedSong.previewUrl;
+      } else if (musicChoice === "upload" && musicFile) {
         const fileExt = musicFile.name.split('.').pop();
         const fileName = `${slug}-audio-${Date.now()}.${fileExt}`;
-        
         const { data: uploadData, error: uploadError } = await supabase.storage.from('gifts_media').upload(fileName, musicFile);
-        if (uploadError) {
-          console.error("Upload audio error:", uploadError);
-          alert("Tải nhạc thất bại do file lỗi hoặc kết nối mạng.");
-        } else if (uploadData) {
+        if (!uploadError && uploadData) {
           finalMusicUrl = supabase.storage.from('gifts_media').getPublicUrl(fileName).data.publicUrl;
         }
       }
 
-      // 4. Save to Database
       const messageToSave = mode === "CUSTOM" ? customMessage : "";
       const styleToSave = mode === "AI" ? style : "";
 
@@ -93,11 +104,10 @@ export default function CreateGiftPage() {
         
       if (dbError) throw dbError;
 
-      // 5. Return new extremely short link
       setGeneratedLink(`${window.location.origin}/${slug}`);
     } catch (err) {
       console.error("Lỗi Database:", err);
-      alert("Lỗi kết nối Database! Vui lòng đảm bảo bạn đã chạy mã SQL thành công.");
+      alert("Lỗi thao tác dữ liệu. Vui lòng đảm bảo bạn đã tạo bảng SQL đầy đủ trong Supabase.");
     } finally {
       setIsGenerating(false);
     }
@@ -131,9 +141,9 @@ export default function CreateGiftPage() {
               <GiftIcon />
             </div>
             <h1 className="text-3xl font-extrabold text-gray-800 mb-2">
-              Tạo Hộp Quà Đám Mây
+              Tạo Hộp Quà Instagram
             </h1>
-            <p className="text-sm font-semibold text-gray-500 mb-2">Supabase Sync Enabled ✨</p>
+            <p className="text-sm font-semibold text-gray-500 mb-2">Tích hợp iTunes Media & Supabase</p>
             
             <div className="flex bg-gray-100 rounded-full p-1 max-w-xs mx-auto mt-4 border border-gray-200">
               <button 
@@ -185,14 +195,13 @@ export default function CreateGiftPage() {
               )}
 
               <div className="bg-pastel-pink/10 p-5 rounded-2xl border border-pastel-pink/30 space-y-4">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-2"><Sparkles className="text-pink-400" size={18}/> Trang Trí Thêm File Lớn </h3>
+                <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-2"><Sparkles className="text-pink-400" size={18}/> Trang Trí Thêm File Media Tự Do</h3>
                 
                 <div className="flex flex-col gap-4 mb-4">
                   <div className="flex-1">
                     <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1"><UploadCloud size={14}/> Tải Tấm Ảnh Đẹp Nhất Lên</label>
                     <input 
-                      type="file" 
-                      accept="image/*"
+                      type="file" accept="image/*"
                       onChange={e => {
                         if (e.target.files && e.target.files.length > 0) setImageFile(e.target.files[0]);
                       }}
@@ -201,67 +210,105 @@ export default function CreateGiftPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                  <div className="flex-1 w-full">
-                    <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1"><Music size={14}/> Nhạc Nền</label>
-                    <select value={music} onChange={e => setMusic(e.target.value)} className="w-full bg-white text-gray-800 rounded-xl p-3 outline-none text-sm border border-gray-200">
-                      <option value="none">Tắt</option>
-                      <option value="happy">Nhạc Sinh Nhật Vui Tươi</option>
-                      <option value="piano">Nhạc Piano Nhẹ Nhàng</option>
-                      <option value="lofi">Lofi Chill Đáng Yêu</option>
-                      <option value="upload">🌟 Tải Nhạc Từ Máy Lên (Mp3)</option>
+                <div className="flex flex-col gap-4">
+                  <div className="flex-1 w-full relative z-10">
+                    <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1"><Music size={14}/> Tìm Nhạc Nền Tuyệt Vời</label>
+                    <select value={musicChoice} onChange={e => setMusicChoice(e.target.value)} className="w-full bg-white text-gray-800 rounded-xl p-3 outline-none text-sm border border-gray-200 mb-3 cursor-pointer ring-1 ring-pastel-blue/50">
+                      <option value="none">Tắt Nhạc</option>
+                      <option value="itunes">🔍 Tìm Bài Hát Trên Apple iTunes</option>
+                      <option value="upload">🌟 Tự Tải File .mp3 Lên</option>
                     </select>
+
+                    {musicChoice === "itunes" && (
+                      <div className="animate-in fade-in slide-in-from-top-2 p-4 bg-white rounded-xl shadow-sm border border-pastel-blue/30 relative">
+                         <div className="flex gap-2 mb-3">
+                           <input 
+                             type="text" 
+                             placeholder="VD: Son Tung M-TP, Bieber..." 
+                             value={songQuery} 
+                             onChange={e => setSongQuery(e.target.value)}
+                             onKeyDown={e => e.key === 'Enter' && handleSearchSong(e as any)}
+                             className="flex-1 bg-gray-50 text-gray-800 rounded-lg p-3 outline-none focus:ring-2 focus:ring-pastel-blue text-sm border border-gray-200"
+                           />
+                           <button type="button" onClick={handleSearchSong} className="bg-pastel-blue text-white p-3 rounded-lg hover:bg-blue-400 transition-colors shadow-sm">
+                             {isSearchingSong ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+                           </button>
+                         </div>
+                         
+                         {songResults.length > 0 && (
+                           <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                             {songResults.map((song, idx) => (
+                               <div 
+                                 key={idx} 
+                                 onClick={() => setSelectedSong(song)}
+                                 className={`cursor-pointer flex items-center gap-3 p-2 rounded-lg transition-colors border ${selectedSong?.previewUrl === song.previewUrl ? 'bg-pastel-blue/20 border-pastel-blue' : 'bg-gray-50 hover:bg-gray-100 border-transparent'}`}
+                               >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                 <img src={song.artworkUrl60} alt="artwork" className="w-10 h-10 rounded-md shadow-sm" />
+                                 <div className="flex-1 overflow-hidden">
+                                   <p className="text-sm font-bold text-gray-800 truncate">{song.trackName}</p>
+                                   <p className="text-xs text-gray-500 truncate">{song.artistName}</p>
+                                 </div>
+                                 <PlayCircle className="text-gray-400 flex-shrink-0" size={18} />
+                               </div>
+                             ))}
+                           </div>
+                         )}
+                         {selectedSong && (
+                           <div className="mt-3 p-2 text-xs font-bold text-green-600 bg-green-50 rounded-lg flex items-center gap-2">
+                             <Check size={14} /> Đã chọn nha: {selectedSong.trackName} - {selectedSong.artistName}
+                           </div>
+                         )}
+                      </div>
+                    )}
+
+                    {musicChoice === "upload" && (
+                      <div className="w-full animate-in fade-in slide-in-from-top-2">
+                        <input 
+                          type="file" 
+                          accept="audio/*"
+                          onChange={e => {
+                            if (e.target.files && e.target.files.length > 0) setMusicFile(e.target.files[0]);
+                          }}
+                          className="w-full bg-white text-gray-700 font-medium rounded-xl p-2 outline-none text-sm border border-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
+                        />
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex-1 w-full">
-                    <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1"><Palette size={14}/> Theme Quà</label>
-                    <select value={themeColor} onChange={e => setThemeColor(e.target.value)} className="w-full bg-white text-gray-800 rounded-xl p-3 outline-none text-sm border border-gray-200">
-                      <option value="pink">Hồng Pastel ngọt ngào</option>
-                      <option value="blue">Xanh Blue năng động</option>
-                      <option value="yellow">Vàng Bơ ấm áp</option>
-                    </select>
+                  <div className="flex flex-col sm:flex-row gap-4 mt-2">
+                    <div className="flex-1">
+                      <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1"><Palette size={14}/> Theme Quà</label>
+                      <select value={themeColor} onChange={e => setThemeColor(e.target.value)} className="w-full bg-white text-gray-800 rounded-xl p-3 outline-none text-sm border border-gray-200">
+                        <option value="pink">Hồng Pastel ngọt ngào</option>
+                        <option value="blue">Xanh Blue năng động</option>
+                        <option value="yellow">Vàng Bơ ấm áp</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                        <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1"><Tag size={14}/> Chế Độ URL</label>
+                        <select value={giftType} onChange={e => setGiftType(e.target.value)} className="w-full bg-white text-gray-800 rounded-xl p-3 outline-none text-sm border border-gray-200">
+                          <option value="gift">🎁 Loại Quà Tặng (/{removeAccents(recipient).toLowerCase().replace(/[^a-z0-9]/g,"-") || "ten"}-gift)</option>
+                          <option value="card">💌 Loại Thiệp Tặng (/{removeAccents(recipient).toLowerCase().replace(/[^a-z0-9]/g,"-") || "ten"}-card)</option>
+                        </select>
+                    </div>
                   </div>
                 </div>
-
-                {music === "upload" && (
-                  <div className="w-full animate-in fade-in slide-in-from-top-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1"><UploadCloud size={14}/> Chọn File Nhạc (.mp3, .wav)</label>
-                    <input 
-                      type="file" 
-                      accept="audio/*"
-                      onChange={e => {
-                        if (e.target.files && e.target.files.length > 0) setMusicFile(e.target.files[0]);
-                      }}
-                      className="w-full bg-white text-gray-700 font-medium rounded-xl p-2 outline-none text-sm border border-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
-                    />
-                  </div>
-                )}
-                
-                <div className="flex-1 mt-4">
-                    <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1"><Tag size={14}/> Cấu Hình Đường Dẫn</label>
-                    <select value={giftType} onChange={e => setGiftType(e.target.value)} className="w-full bg-white text-gray-800 rounded-xl p-3 outline-none text-sm border border-gray-200">
-                      <option value="gift">🎁 Loại Quà Tặng (/{removeAccents(recipient).toLowerCase().replace(/[^a-z0-9]/g,"-") || "ten"}-gift)</option>
-                      <option value="card">💌 Loại Thiệp Tặng (/{removeAccents(recipient).toLowerCase().replace(/[^a-z0-9]/g,"-") || "ten"}-card)</option>
-                    </select>
-                    <p className="text-xs text-gray-500 font-medium mt-1 ml-1 cursor-default">Đường dẫn rút gọn của bạn sẽ cực kỳ tinh tế.</p>
-                </div>
-
               </div>
 
               <button type="submit" disabled={isGenerating || !recipient || !sender || (mode === "CUSTOM" && !customMessage)} className="w-full bg-gradient-to-r from-pastel-pink to-[#ffb6c1] hover:to-[#ffa6b3] text-gray-800 font-extrabold text-xl py-4 rounded-2xl transition-all flex items-center justify-center gap-3 transform active:scale-95 shadow-lg shadow-pink-200/50 disabled:opacity-70 disabled:cursor-not-allowed group mt-8">
                 {isGenerating ? (
                   <><Sparkles className="animate-spin" size={24} /> Đang Upload & Đóng Gói Database...</>
                 ) : (
-                  <><GiftIcon className="group-hover:scale-110 transition-transform" /> Tạo Link & Mã QR</>
+                  <><GiftIcon className="group-hover:scale-110 transition-transform" /> Lưu Quà & Tạo Mã QR</>
                 )}
               </button>
             </form>
           ) : (
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
               <div className="bg-[#e6f4ea] text-green-700 p-4 rounded-2xl font-bold mb-6 flex items-center justify-center gap-2 border border-green-200">
-                <Check size={20} /> Đã Tạo & Upload File Thành Công!
+                <Check size={20} /> Đã Tạo & Upload Thành Công!
               </div>
-              <p className="text-gray-600 font-medium mb-3">Link cực xịn của bạn (hãy chia sẻ qua Facebook/Zalo):</p>
               
               <div className="flex items-center gap-2 bg-pastel-cream p-3 rounded-2xl border border-gray-200 focus-within:ring-2 ring-pastel-blue transition-all mb-6">
                 <input type="text" value={generatedLink} readOnly className="bg-transparent w-full text-blue-600 outline-none px-2 font-bold text-sm" />
@@ -270,30 +317,31 @@ export default function CreateGiftPage() {
                 </button>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center justify-center mb-8">
-                 <p className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2">
-                   <QrCode size={16} /> Quét Để Trải Nghiệm
-                 </p>
-                 <div className="p-3 bg-white border-2 border-dashed border-gray-300 rounded-2xl">
+              <div className="bg-white p-5 rounded-2xl border border-pastel-pink/40 shadow-sm flex flex-col items-center justify-center mb-8 relative">
+                 <div className="absolute top-[-15px] bg-white px-4 py-1 border border-pastel-pink rounded-full text-xs font-bold text-pink-500 shadow-sm">
+                   Quét Mã Mở Quà
+                 </div>
+                 <div className="p-2 border border-gray-100 rounded-xl translate-y-2 hover:scale-105 transition-transform">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(generatedLink)}&margin=10`} 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(generatedLink)}&margin=10&color=d16ea4`} 
                       alt="QR Code" 
                       className="w-[180px] h-[180px]"
                     />
                  </div>
                  <a 
-                   href={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(generatedLink)}&margin=20`}
+                   href={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(generatedLink)}&margin=20&color=d16ea4`}
                    download="Qua-Tang-QR.png"
                    target="_blank"
-                   className="mt-4 text-xs font-bold text-pastel-blue hover:text-blue-500 underline underline-offset-4"
+                   className="mt-6 text-xs font-bold text-gray-500 hover:text-pink-500 underline underline-offset-4"
                  >
-                   Mở QR Chất Lượng Cao
+                   Tải Mã QR Ảnh Gốc (HD)
                  </a>
               </div>
 
               <div className="flex flex-col gap-4">
-                <a href={generatedLink} className="inline-flex items-center justify-center gap-2 text-white bg-gray-800 px-6 py-4 rounded-2xl font-bold hover:bg-gray-700 transition shadow" target="_blank">
-                  Khui Hộp Quà Thử Ngay <ArrowRight size={18} />
+                <a href={generatedLink} className="inline-flex items-center justify-center gap-2 text-white bg-gray-800 px-6 py-4 rounded-2xl font-bold hover:bg-gray-700 transition shadow-lg" target="_blank">
+                  Trải Nghiệm Đỉnh Cao Ngay <ArrowRight size={18} />
                 </a>
               </div>
             </motion.div>
