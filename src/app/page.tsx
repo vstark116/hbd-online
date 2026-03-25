@@ -27,12 +27,16 @@ export default function Home() {
     let highlighted: Character[] = [...localCelebrities];
     let allWiki: Character[] = [];
 
-    // TỪ KHÓA ĐIỂM CAO ĐỂ LỌC VĨ NHÂN, VIP, SỰ KIỆN QUỐC TẾ KHỦNG BỐ
+    // TỪ KHÓA ĐIỂM CAO ĐỂ LỌC VĨ NHÂN, VIP, SỰ KIỆN QUỐC TẾ KHỦNG BỐ (ĐA NGÔN NGỮ)
     const priorityKeywords = [
       "việt nam", "hồ chí minh", "chiến tranh", "độc lập", "tổng thống", 
-      "vô địch", "cách mạng", "phát xít", "thế chiến", "hoàng đế", "tòa tháp đôi",
+      "vô địch", "cách mạng", "thế chiến", "tháp đôi", "tòa tháp",
       "khủng bố", "thể thao", "bóng đá", "cúp", "nobel", "oscar", "vua", "nữ hoàng",
-      "tỷ phú", "toàn cầu", "lịch sử", "nổi tiếng", "đóng góp", "president"
+      "tỷ phú", "lịch sử", "nổi tiếng", "đóng góp",
+      // Tiếng Anh (Dữ liệu chủ chốt)
+      "vietnam", "war", "independence", "president", "champion", "revolution",
+      "world war", "twin towers", "september 11", "terror", "terrorist", "attack", 
+      "football", "queen", "king", "history", "famous", "billionaire", "empire"
     ];
 
     const calculateScore = (name: string, desc: string) => {
@@ -46,12 +50,12 @@ export default function Home() {
     };
 
     try {
-      // Bắt API Selected (Sự kiện nổi bật trong ngày do BTV Wiki chọn)
-      const resSel = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/vi/onthisday/selected/${month}/${day}`);
-      const resSelEn = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/selected/${month}/${day}`);
-      let selData = resSel.ok ? await resSel.json() : (resSelEn.ok ? await resSelEn.json() : null);
+      // API tiếng Việt (vi) bị giới hạn hỗ trợ từ gốc Wikimedia khiến trình duyệt báo 404 Error
+      // Dùng trực tiếp API English (en) để đảm bảo 100% tỷ lệ load sự kiện siêu khổng lồ không lỗi.
+      const resSel = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/selected/${month}/${day}`);
+      const selData = resSel.ok ? await resSel.json() : { selected: [] };
 
-      if (selData && selData.selected) {
+      if (selData.selected) {
         const wikiHighlights = selData.selected.map((s: any, i: number) => {
           const page = s.pages?.[0];
           let desc = page?.extract || s.text;
@@ -65,20 +69,18 @@ export default function Home() {
             didYouKnow: desc,
             type: 'celebrity'
           } as Character;
-        }).filter((c: any) => c.avatar && !c.avatar.includes("Wikipedia-logo")); // Chỉ lấy tin có ảnh hiển thị cho đẹp
+        }).filter((c: any) => c.avatar && !c.avatar.includes("Wikipedia-logo")); 
         
-        // Đẩy vào nhóm Nổi Bật
         highlighted = [...highlighted, ...wikiHighlights];
       }
 
-      // Bắt API Births & Events (Tất cả Dữ Liệu trên thế giới)
-      const resBirth = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/vi/onthisday/births/${month}/${day}`);
-      const resEvent = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/vi/onthisday/events/${month}/${day}`);
+      // API Lịch sử & Sinh Nhật toàn cầu
+      const resBirth = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/births/${month}/${day}`);
+      const resEvent = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/events/${month}/${day}`);
       
-      let birthData = resBirth.ok ? await resBirth.json() : { births: [] };
-      let eventData = resEvent.ok ? await resEvent.json() : { events: [] };
+      const birthData = resBirth.ok ? await resBirth.json() : { births: [] };
+      const eventData = resEvent.ok ? await resEvent.json() : { events: [] };
 
-      // Gộp chung Sinh Nhật & Sự kiện để chiếu ở dưới cùng
       const rawMassiveList = [...(birthData.births || []), ...(eventData.events || [])];
 
       allWiki = rawMassiveList.map((m: any, i: number) => {
