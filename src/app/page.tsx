@@ -4,11 +4,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import SearchForm from "@/components/SearchForm";
 import CharacterCard from "@/components/CharacterCard";
 import { charactersData, Character } from "@/data/mockData";
-import { Sparkles, SpaceIcon as Calendar, Gift, Loader2 } from "lucide-react";
+import { Sparkles, SpaceIcon as Calendar, Gift, Loader2, Star, Globe } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
-  const [results, setResults] = useState<{ anime: Character[], celebrity: Character[] } | null>(null);
+  const [results, setResults] = useState<{ anime: Character[], highlighted: Character[], allWiki: Character[] } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
   const cleanName = (rawText: string) => {
@@ -22,98 +22,98 @@ export default function Home() {
     
     // 1. Anime Matches
     const animeMatches = charactersData.filter(char => char.birthDate === searchDate && char.type === "anime");
-    let mappedCelebrities: Character[] = charactersData.filter(char => char.birthDate === searchDate && char.type === "celebrity");
+    const localCelebrities = charactersData.filter(char => char.birthDate === searchDate && char.type === "celebrity");
 
-    // 2. Wikipedia On This Day API (for Celebrities & Events)
+    let highlighted: Character[] = [...localCelebrities];
+    let allWiki: Character[] = [];
+
+    // TỪ KHÓA ĐIỂM CAO ĐỂ LỌC VĨ NHÂN, VIP, SỰ KIỆN QUỐC TẾ KHỦNG BỐ
+    const priorityKeywords = [
+      "việt nam", "hồ chí minh", "chiến tranh", "độc lập", "tổng thống", 
+      "vô địch", "cách mạng", "phát xít", "thế chiến", "hoàng đế", "tòa tháp đôi",
+      "khủng bố", "thể thao", "bóng đá", "cúp", "nobel", "oscar", "vua", "nữ hoàng",
+      "tỷ phú", "toàn cầu", "lịch sử", "nổi tiếng", "đóng góp", "president"
+    ];
+
+    const calculateScore = (name: string, desc: string) => {
+      let score = 0;
+      const textToAnalyze = (name + " " + desc).toLowerCase();
+      priorityKeywords.forEach(kw => {
+        if (textToAnalyze.includes(kw)) score += 50; 
+      });
+      score += Math.min(textToAnalyze.length / 20, 15); // Bonus cho bài viết dài/chi tiết
+      return score;
+    };
+
     try {
-      // Bắt API Births (Người sinh ra)
+      // Bắt API Selected (Sự kiện nổi bật trong ngày do BTV Wiki chọn)
+      const resSel = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/vi/onthisday/selected/${month}/${day}`);
+      const resSelEn = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/selected/${month}/${day}`);
+      let selData = resSel.ok ? await resSel.json() : (resSelEn.ok ? await resSelEn.json() : null);
+
+      if (selData && selData.selected) {
+        const wikiHighlights = selData.selected.map((s: any, i: number) => {
+          const page = s.pages?.[0];
+          let desc = page?.extract || s.text;
+          if (desc.length > 150) desc = desc.substring(0, 150) + "...";
+          return {
+            id: `hl-${i}`,
+            name: cleanName(page?.title || s.text.split(" - ")[0] || "Sự Kiện Lớn"),
+            birthDate: searchDate,
+            avatar: page?.thumbnail?.source || "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Wikipedia-logo-v2.svg/150px-Wikipedia-logo-v2.svg.png",
+            occupation: s.year ? `Cột mốc năm ${s.year}` : "Sự Kiện Lịch Sử",
+            didYouKnow: desc,
+            type: 'celebrity'
+          } as Character;
+        }).filter((c: any) => c.avatar && !c.avatar.includes("Wikipedia-logo")); // Chỉ lấy tin có ảnh hiển thị cho đẹp
+        
+        // Đẩy vào nhóm Nổi Bật
+        highlighted = [...highlighted, ...wikiHighlights];
+      }
+
+      // Bắt API Births & Events (Tất cả Dữ Liệu trên thế giới)
       const resBirth = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/vi/onthisday/births/${month}/${day}`);
-      const resEnBirth = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/births/${month}/${day}`); // Fallback
-      
-      let birthData = resBirth.ok ? await resBirth.json() : (resEnBirth.ok ? await resEnBirth.json() : null);
-      
-      if (birthData && birthData.births) {
-        const wikiBirths: Character[] = birthData.births
-          .map((b: any, i: number) => {
-            const page = b.pages?.[0];
-            const name = cleanName(page?.title || b.text.split(" - ")[0]);
-            let desc = page?.extract || page?.description || b.text;
-            if (desc.length > 120) desc = desc.substring(0, 120) + "...";
-            
-            return {
-              id: `wiki-birth-${i}`,
-              name: name,
-              birthDate: searchDate,
-              avatar: page?.thumbnail?.source || "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Wikipedia-logo-v2.svg/150px-Wikipedia-logo-v2.svg.png",
-              occupation: b.year ? `Sinh năm ${b.year}` : "Người nổi tiếng",
-              didYouKnow: desc,
-              type: 'celebrity'
-            } as Character;
-          })
-          .filter((c: any) => c.avatar && !c.avatar.includes("Wikipedia-logo"));
-
-        mappedCelebrities = [...mappedCelebrities, ...wikiBirths];
-      }
-
-      // Bắt API Events (Sự kiện lịch sử)
       const resEvent = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/vi/onthisday/events/${month}/${day}`);
-      const resEnEvent = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/events/${month}/${day}`);
       
-      let eventData = resEvent.ok ? await resEvent.json() : (resEnEvent.ok ? await resEnEvent.json() : null);
+      let birthData = resBirth.ok ? await resBirth.json() : { births: [] };
+      let eventData = resEvent.ok ? await resEvent.json() : { events: [] };
 
-      if (eventData && eventData.events) {
-        const wikiEvents: Character[] = eventData.events
-          .map((e: any, i: number) => {
-            const page = e.pages?.[0];
-            let desc = page?.extract || e.text;
-            if (desc.length > 150) desc = desc.substring(0, 150) + "...";
-            
-            return {
-              id: `wiki-event-${i}`,
-              name: `Sự kiện Năm ${e.year}`,
-              birthDate: searchDate,
-              avatar: page?.thumbnail?.source || "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Wikipedia-logo-v2.svg/150px-Wikipedia-logo-v2.svg.png",
-              occupation: "Dấu ấn lịch sử",
-              didYouKnow: desc,
-              type: 'celebrity' // Reusing formatting
-            } as Character;
-          })
-          .filter((c: any) => c.avatar && !c.avatar.includes("Wikipedia-logo"));
+      // Gộp chung Sinh Nhật & Sự kiện để chiếu ở dưới cùng
+      const rawMassiveList = [...(birthData.births || []), ...(eventData.events || [])];
 
-        mappedCelebrities = [...mappedCelebrities, ...wikiEvents];
-      }
+      allWiki = rawMassiveList.map((m: any, i: number) => {
+        const page = m.pages?.[0];
+        const name = cleanName(page?.title || m.text.split(" - ")[0] || "Unknown");
+        let desc = page?.extract || page?.description || m.text;
+        if (desc.length > 120) desc = desc.substring(0, 120) + "...";
+        
+        return {
+          id: `all-${i}`,
+          name: name,
+          birthDate: searchDate,
+          avatar: page?.thumbnail?.source || "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Wikipedia-logo-v2.svg/150px-Wikipedia-logo-v2.svg.png",
+          occupation: m.year ? `Năm ${m.year}` : "Nhân vật / Sự kiện",
+          didYouKnow: desc,
+          type: 'celebrity',
+          _score: calculateScore(name, desc) // Chấm điểm ngay lập tức
+        } as Character & { _score: number };
+      });
 
     } catch (err) {
       console.warn("Lỗi tải API Wikipedia, chuyển sang dữ liệu nội bộ.");
     } finally {
-      // Bố lọc trùng & Hệ Thống Tính Điểm Sự Kiện (AI Scoring)
-      const uniqueItems = Array.from(new Map(mappedCelebrities.map(item => [item.name, item])).values());
+      // 1. Phân loại Highlighted (Duy nhất 1)
+      const uniqueHighlighted = Array.from(new Map(highlighted.map(item => [item.name, item])).values());
       
-      const priorityKeywords = ["việt nam", "hồ chí minh", "chiến tranh", "độc lập", "tổng thống", "vô địch", "cách mạng", "phát xít", "thế chiến", "hoàng đế", "đóng góp", "nổi tiếng"];
-      
-      const scoredItems = uniqueItems.map(item => {
-        let score = 0;
-        const textToAnalyze = (item.name + " " + item.didYouKnow).toLowerCase();
-        
-        priorityKeywords.forEach(kw => {
-          if (textToAnalyze.includes(kw)) score += 20; // Trọng số cực lớn cho Từ Khóa Lịch sử vĩ đại
-        });
-        
-        // Thêm điểm nếu sự kiện chi tiết (được ghi chép dài)
-        score += Math.min(textToAnalyze.length / 50, 10);
-        
-        // Add random slight variation so it doesn't look identical if scores are tied
-        score += Math.random() * 2;
-        
-        return { ...item, _score: score };
-      });
-      
-      // Xếp hạng vĩ nhân & sự kiện từ cao xuống thấp
-      scoredItems.sort((a, b) => b._score - a._score);
-      
+      // 2. Sắp xếp Tất Cả Sự Kiện theo Điểm Số AI để đẩy Tổng Thống, Sự kiện lớn lên đầu
+      const scoredAllWiki = allWiki as (Character & { _score: number })[];
+      scoredAllWiki.sort((a, b) => b._score - a._score);
+      const uniqueAllWiki = Array.from(new Map(scoredAllWiki.map(item => [item.name, item])).values());
+
       setResults({ 
         anime: animeMatches, 
-        celebrity: scoredItems.slice(0, 15) 
+        highlighted: uniqueHighlighted.slice(0, 12), // Giới hạn top nổi bật
+        allWiki: uniqueAllWiki.slice(0, 50) // Hiện tới TẬN 50 sự kiện phía dưới cho người dùng cuộn mỏi tay!
       });
       setIsSearching(false);
     }
@@ -141,7 +141,7 @@ export default function Home() {
             Hôm Nay Là <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-pastel-blue">Sinh Nhật</span> Ai?
           </h1>
           <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto font-medium">
-            Khám phá những nhân vật anime huyền thoại, vĩ nhân thế giới và các sự kiện lịch sử cùng ngày với bạn!
+            Khám phá những nhân vật anime huyền thoại, vĩ nhân thế giới và vô số sự kiện lịch sử cùng ngày với bạn!
           </p>
         </motion.div>
 
@@ -151,7 +151,7 @@ export default function Home() {
           {isSearching && (
             <div className="mt-8 flex flex-col items-center justify-center text-pastel-blue drop-shadow-sm">
               <Loader2 className="animate-spin mb-4" size={40} />
-              <p className="font-bold tracking-widest uppercase animate-pulse">Đang Lục Tìm Bách Khoa Toàn Thư Wikipedia...</p>
+              <p className="font-bold tracking-widest uppercase animate-pulse">Đang Lục Tìm Hàng Triệu Biên Niên Sử Toàn Cầu...</p>
             </div>
           )}
         </div>
@@ -163,7 +163,7 @@ export default function Home() {
           </Link>
           <Link href="/create-gift" className="bg-white px-6 py-4 rounded-2xl shadow-lg flex items-center gap-3 font-bold text-gray-700 hover:scale-105 transition-transform border border-gray-100 w-full sm:w-auto justify-center">
             <Gift size={24} className="text-pastel-pink" />
-            Tạo Quà Ảo Đám Mây
+            Tạo Quà Ảo Mây
           </Link>
         </div>
 
@@ -174,21 +174,23 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.5 }}
-              className="w-full"
+              className="w-full flex flex-col items-center"
             >
-              {results.anime.length === 0 && results.celebrity.length === 0 ? (
+              {results.anime.length === 0 && results.highlighted.length === 0 && results.allWiki.length === 0 ? (
                 <div className="text-center bg-white/50 p-10 rounded-[2rem] border border-dashed border-gray-300 max-w-lg mx-auto">
                   <p className="text-xl text-gray-600 font-medium">
-                    Oops! Hiện chưa có dữ liệu nào xảy ra vào ngày này trong vũ trụ. 🛸
+                    Oops! Có vẻ là ngày này trong vũ trụ chưa từng xảy ra sự kiện nào nổi bật cả. 🛸
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-16 w-full">
+                <div className="flex flex-col gap-16 w-full max-w-6xl">
+                  
+                  {/* QUỐC BẢO ANIME */}
                   {results.anime.length > 0 && (
                      <section className="flex flex-col items-center">
-                       <div className="bg-pastel-pink/20 px-8 py-3 rounded-full mb-8">
-                         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                           🌟 Anime
+                       <div className="bg-gradient-to-r from-pastel-pink to-[#ffb6c1] px-10 py-4 rounded-full mb-10 shadow-lg border-2 border-white transform hover:scale-105 transition-transform">
+                         <h2 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                           🌟 Anime & Manga Huyền Thoại
                          </h2>
                        </div>
                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 w-full justify-items-center">
@@ -196,18 +198,45 @@ export default function Home() {
                        </div>
                      </section>
                   )}
-                  {results.celebrity.length > 0 && (
+
+                  {/* SỰ KIỆN & VĨ NHÂN NỔI BẬT NHẤT */}
+                  {results.highlighted.length > 0 && (
                      <section className="flex flex-col items-center">
-                       <div className="bg-pastel-blue/20 px-8 py-3 rounded-full mb-8">
-                         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                           🌎 Từ Wikipedia (Khởi Sinh & Lịch Sử)
+                       <div className="bg-gradient-to-r from-pastel-yellow to-[#ffe066] px-10 py-4 rounded-full mb-10 shadow-lg border-2 border-white transform hover:scale-105 transition-transform">
+                         <h2 className="text-3xl font-extrabold text-gray-800 flex items-center gap-3">
+                           👑 Tiêu Điểm: Nhân Vật & Di Sản Vĩ Đại Khởi Sinh 
+                           <Star fill="currentColor" size={28} className="text-yellow-500"/>
                          </h2>
                        </div>
-                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 md:gap-x-12 gap-y-12 w-full justify-items-center">
-                         {results.celebrity.map(char => <CharacterCard key={char.id} character={char} />)}
+                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 w-full justify-items-center">
+                         {results.highlighted.map(char => <CharacterCard key={char.id} character={char} />)}
                        </div>
                      </section>
                   )}
+
+                  {/* TẤT CẢ SỰ KIỆN DÀI BẤT TẬN (ĐÃ SORT BẰNG AI THEO ĐỘ NỔI TIẾNG) */}
+                  {results.allWiki.length > 0 && (
+                     <section className="flex flex-col items-center mt-8 pt-16 border-t border-pastel-pink/30 relative">
+                       <div className="absolute top-[-30px] bg-white border border-gray-200 px-6 py-3 rounded-full shadow-sm flex items-center gap-2">
+                         <Globe className="text-pastel-blue animate-pulse" />
+                         <span className="font-bold text-gray-600 uppercase tracking-widest text-sm">Hồ Sơ Hành Tinh (50+ Sự Kiện Mở Rộng)</span>
+                       </div>
+                       
+                       <p className="text-gray-500 font-medium text-center max-w-2xl mb-12">
+                         Dưới đây là một hành trình dài ghi chép lại mọi sự kiện, nhà khoa học, tỷ phú, diễn viên hay vận động viên có trên hệ thống. (Đã được sắp xếp đưa những người đóng góp khủng, thể thao siêu sao hay khủng bố 11/9 lên trên cùng). Scroll để khám phá vô hạn!
+                       </p>
+
+                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full justify-items-center opacity-90">
+                         {results.allWiki.map(char => (
+                           // Thu nhỏ thẻ AllWiki một tí để nhìn được nhiều dữ liệu hơn
+                           <div key={char.id} className="scale-90 w-full flex justify-center hover:scale-95 transition-transform hover:opacity-100 opacity-95">
+                             <CharacterCard character={char} />
+                           </div>
+                         ))}
+                       </div>
+                     </section>
+                  )}
+                  
                 </div>
               )}
             </motion.div>
