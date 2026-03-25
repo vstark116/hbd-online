@@ -86,15 +86,34 @@ export default function Home() {
     } catch (err) {
       console.warn("Lỗi tải API Wikipedia, chuyển sang dữ liệu nội bộ.");
     } finally {
-      // Remove pure duplicates by name
+      // Bố lọc trùng & Hệ Thống Tính Điểm Sự Kiện (AI Scoring)
       const uniqueItems = Array.from(new Map(mappedCelebrities.map(item => [item.name, item])).values());
       
-      // Shuffle random top 15 events/people so it's always interesting
-      const shuffled = uniqueItems.sort(() => 0.5 - Math.random());
+      const priorityKeywords = ["việt nam", "hồ chí minh", "chiến tranh", "độc lập", "tổng thống", "vô địch", "cách mạng", "phát xít", "thế chiến", "hoàng đế", "đóng góp", "nổi tiếng"];
+      
+      const scoredItems = uniqueItems.map(item => {
+        let score = 0;
+        const textToAnalyze = (item.name + " " + item.didYouKnow).toLowerCase();
+        
+        priorityKeywords.forEach(kw => {
+          if (textToAnalyze.includes(kw)) score += 20; // Trọng số cực lớn cho Từ Khóa Lịch sử vĩ đại
+        });
+        
+        // Thêm điểm nếu sự kiện chi tiết (được ghi chép dài)
+        score += Math.min(textToAnalyze.length / 50, 10);
+        
+        // Add random slight variation so it doesn't look identical if scores are tied
+        score += Math.random() * 2;
+        
+        return { ...item, _score: score };
+      });
+      
+      // Xếp hạng vĩ nhân & sự kiện từ cao xuống thấp
+      scoredItems.sort((a, b) => b._score - a._score);
       
       setResults({ 
         anime: animeMatches, 
-        celebrity: shuffled.slice(0, 18) 
+        celebrity: scoredItems.slice(0, 15) 
       });
       setIsSearching(false);
     }
