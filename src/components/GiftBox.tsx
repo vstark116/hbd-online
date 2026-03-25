@@ -17,6 +17,7 @@ export default function GiftBox({ sender = "Một người bạn", message, imag
 
   // Use public royalty-free music URLs for demo
   const getMusicUrl = (m: string) => {
+    if (m.startsWith('http')) return m;
     switch (m) {
       case "happy": return "https://cdn.pixabay.com/download/audio/2022/01/21/audio_104f4ebdcd.mp3?filename=happy-birthday-music-box-122421.mp3";
       case "piano": return "https://cdn.pixabay.com/download/audio/2022/10/25/audio_82cffe96c9.mp3?filename=beautiful-piano-122709.mp3";
