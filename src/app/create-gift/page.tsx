@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, ArrowRight, Wand2, Copy, Check, PenTool, Image as ImageIcon, Music, Palette, UploadCloud, Tag, QrCode, Search, PlayCircle } from "lucide-react";
+import { Sparkles, ArrowRight, Wand2, Copy, Check, PenTool, Image as ImageIcon, Music, Palette, UploadCloud, Tag, QrCode, Search, PlayCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { charactersData } from "@/data/mockData";
 import { supabase } from "@/lib/supabase";
