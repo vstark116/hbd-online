@@ -27,16 +27,44 @@ export default function Home() {
     let highlighted: Character[] = [...localCelebrities];
     let allWiki: Character[] = [];
 
-    // TỪ KHÓA ĐIỂM CAO ĐỂ LỌC VĨ NHÂN, VIP, SỰ KIỆN QUỐC TẾ KHỦNG BỐ (ĐA NGÔN NGỮ)
+    // TỪ KHÓA ĐIỂM CAO ĐỂ LỌC VĨ NHÂN, VIP, SỰ KIỆN QUỐC TẾ, LỊCH SỬ VN (ĐA NGÔN NGỮ)
     const priorityKeywords = [
-      "việt nam", "hồ chí minh", "chiến tranh", "độc lập", "tổng thống", 
-      "vô địch", "cách mạng", "thế chiến", "tháp đôi", "tòa tháp",
-      "khủng bố", "thể thao", "bóng đá", "cúp", "nobel", "oscar", "vua", "nữ hoàng",
-      "tỷ phú", "lịch sử", "nổi tiếng", "đóng góp",
-      // Tiếng Anh (Dữ liệu chủ chốt)
-      "vietnam", "war", "independence", "president", "champion", "revolution",
-      "world war", "twin towers", "september 11", "terror", "terrorist", "attack", 
-      "football", "queen", "king", "history", "famous", "billionaire", "empire"
+      // 1. NHÂN VẬT ẢNH HƯỞNG (Lãnh đạo, Khoa học, Tỷ phú)
+      "tổng thống", "thủ tướng", "đại tướng", "lãnh đạo", "vua", "nữ hoàng", "hoàng đế",
+      "nhà khoa học", "nhà nghiên cứu", "nhà phát minh", "giáo sư", "tỷ phú", "sáng lập",
+      "nobel", "oscar", "pulitzer", "đóng góp", "nổi tiếng", "vĩ đại",
+      // Tiếng Anh
+      "president", "prime minister", "general", "leader", "king", "queen", "emperor",
+      "scientist", "researcher", "inventor", "professor", "billionaire", "founder", "ceo",
+      "nobel prize", "academy award", "oscar", "contribution", "famous", "influential",
+
+      // 2. THỂ THAO & NGHỆ THUẬT (Vận động viên, Siêu sao)
+      "vận động viên", "vô địch", "kỷ lục", "huy chương", "thể thao", "bóng đá", "cúp",
+      "ca sĩ", "diễn viên", "nghệ sĩ", "đạo diễn",
+      // Tiếng Anh
+      "athlete", "champion", "record", "medal", "sports", "football", "soccer", "world cup",
+      "singer", "actor", "actress", "artist", "director", "legend",
+
+      // 3. SỰ KIỆN LỊCH SỬ VIỆT NAM (Trọng tâm)
+      "việt nam", "hồ chí minh", "chiến tranh việt nam", "độc lập", "cách mạng", 
+      "giải phóng", "thống nhất", "điện biên phủ", "việt minh", "mặt trận",
+      "30 tháng 4", "2 tháng 9", "1945", "1975",
+      // Tiếng Anh
+      "vietnam", "ho chi minh", "vietnam war", "independence", "revolution",
+      "liberation", "reunification", "fall of saigon", "dien bien phu", "viet minh",
+
+      // 4. SỰ KIỆN QUỐC TẾ ĐỘNG TRỜI (Chiến tranh, Khủng bố)
+      "chiến tranh", "thế chiến", "chiến dịch", "đế quốc", "lịch sử", "hiệp ước",
+      "tháp đôi", "tòa tháp", "khủng bố", "ám sát", "11 tháng 9",
+      // Tiếng Anh
+      "war", "world war", "campaign", "empire", "history", "treaty", "assassination",
+      "twin towers", "september 11", "9/11", "terror", "terrorist", "attack", "tragedy",
+
+      // 5. THIÊN TAI & THẢM HỌA (Bão, Động đất, Sóng thần)
+      "thiên tai", "thảm họa", "động đất", "sóng thần", "bão", "siêu bão", "núi lửa", "đại dịch",
+      // Tiếng Anh
+      "disaster", "catastrophe", "earthquake", "tsunami", "hurricane", "typhoon", 
+      "storm", "volcano", "eruption", "pandemic", "plague"
     ];
 
     const calculateScore = (name: string, desc: string) => {
