@@ -15,7 +15,7 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Birthday Universe - Tra Cứu & Quà Tặng Sinh Nhật Ảo",
+  title: "Birthday Nexus - Tra Cứu & Quà Tặng Sinh Nhật Ảo",
   description: "Khám phá xem ai sinh cùng ngày với bạn, tạo bộ đếm ngược sinh nhật cá nhân và gửi hộp quà ảo đầy bất ngờ tích hợp AI.",
 };
 

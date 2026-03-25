@@ -253,7 +253,7 @@ export default function Home() {
                        </div>
                        
                        <p className="text-gray-500 font-medium text-center max-w-2xl mb-12">
-                         Dưới đây là một hành trình dài ghi chép lại mọi sự kiện, nhà khoa học, tỷ phú, diễn viên hay vận động viên có trên hệ thống. (Đã được sắp xếp đưa những người đóng góp khủng, thể thao siêu sao hay khủng bố 11/9 lên trên cùng). Scroll để khám phá vô hạn!
+                         Dưới đây là một hành trình dài ghi chép lại mọi sự kiện, nhà khoa học, tỷ phú, diễn viên hay vận động viên có trên hệ thống. 
                        </p>
 
                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full justify-items-center opacity-90">
