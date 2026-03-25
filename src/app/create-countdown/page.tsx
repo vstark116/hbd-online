@@ -69,7 +69,7 @@ export default function CreateCountdownPage() {
                   type="text" 
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder="Ví dụ: Hoàng Phạm..."
+                  placeholder="Ví dụ: Tâm Võ..."
                   className="w-full bg-pastel-cream text-gray-800 rounded-2xl p-4 outline-none focus:ring-4 focus:ring-pastel-blue/50 transition-all font-bold text-lg border border-gray-100/50"
                   required
                 />

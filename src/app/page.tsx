@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import SearchForm from "@/components/SearchForm";
 import CharacterCard from "@/components/CharacterCard";
 import { charactersData, Character } from "@/data/mockData";
-import { Sparkles, SpaceIcon as Calendar, Gift, Loader2, Star, Globe } from "lucide-react";
+import { Sparkles, Timer, Gift, Loader2, Star, Globe } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
@@ -188,7 +188,7 @@ export default function Home() {
 
         <div className="flex flex-wrap justify-center gap-4 mb-20 w-full px-4">
           <Link href="/create-countdown" className="bg-white px-6 py-4 rounded-2xl shadow-lg flex items-center gap-3 font-bold text-gray-700 hover:scale-105 transition-transform border border-gray-100 w-full sm:w-auto justify-center">
-            <Calendar size={24} className="text-pastel-blue" />
+            <Timer size={24} className="text-pastel-blue" />
             Tạo Đếm Ngược
           </Link>
           <Link href="/create-gift" className="bg-white px-6 py-4 rounded-2xl shadow-lg flex items-center gap-3 font-bold text-gray-700 hover:scale-105 transition-transform border border-gray-100 w-full sm:w-auto justify-center">
